@@ -131,7 +131,9 @@ r = client.post(
         "committer": {"name": cn, "email": ce, "date": cd},
     },
 )
-r.raise_for_status()
+if r.status_code >= 400:
+    print("创建 commit 失败:", r.status_code, r.text[:500])
+    raise SystemExit(1)
 remote_commit = r.json()["sha"]
 print(f"commit: 本地 {local_commit} / 远端 {remote_commit}")
 
