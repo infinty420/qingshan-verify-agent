@@ -265,15 +265,16 @@ tr:hover td{background:#fafbfc}
 const $ = s => document.querySelector(s);
 let TOKEN = null, USER = null, curSession = null, streaming = false;
 
-/* 云端分享链接兼容：若 URL 带 sharecode，则附加到每个 API 请求上，
-   避免 iframe/无痕/第三方 Cookie 拦截导致代理 403（不依赖 Cookie） */
-function shareQ(){
-  const m = location.search.match(/[?&]sharecode=([^&]+)/);
-  return m ? ('sharecode=' + encodeURIComponent(m[1])) : '';
-}
+/* 云端分享链接兼容：sharecode 与 access_token 附加到每个 API 请求，
+   避免 iframe/无痕/第三方 Cookie 拦截导致代理 403（不依赖 Cookie），
+   access_token 同时是 Authorization 头被代理覆盖时的备用通道 */
 function withShare(url){
-  const q = shareQ();
-  return q ? (url + (url.includes('?') ? '&' : '?') + q) : url;
+  const params = [];
+  const m = location.search.match(/[?&]sharecode=([^&]+)/);
+  if (m) params.push('sharecode=' + encodeURIComponent(m[1]));
+  if (TOKEN) params.push('access_token=' + encodeURIComponent(TOKEN));
+  if (!params.length) return url;
+  return url + (url.includes('?') ? '&' : '?') + params.join('&');
 }
 
 function api(path, opts = {}) {
