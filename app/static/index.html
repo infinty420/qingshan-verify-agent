@@ -279,10 +279,12 @@ function withShare(url){
 function api(path, opts = {}) {
   opts.headers = Object.assign({'Content-Type':'application/json'}, TOKEN ? {Authorization:'Bearer '+TOKEN} : {}, opts.headers||{});
   return fetch(withShare('/api/v1'+path), opts).then(async r => {
-    if (r.status === 401) { toast('登录已过期，请重新登录'); logout(); throw new Error('401'); }
-    if (r.status === 403) { toast('访问被拒绝(403)：请确认使用完整分享链接（含 ?sharecode=...）'); throw new Error('403'); }
+    // 登录接口自身的 401 = 用户名或密码错误，走统一错误分支显示真实原因；
+    // 其余接口的 401 才是 token 过期
+    if (r.status === 401 && path !== '/auth/login') { toast('登录已过期，请重新登录'); logout(); throw new Error('401'); }
+    if (r.status === 403 && path !== '/auth/login') { toast('访问被拒绝(403)：请确认使用完整分享链接（含 ?sharecode=...）'); throw new Error('403'); }
     const data = await r.json().catch(()=>({}));
-    if (!r.ok) throw new Error(data.detail || r.status);
+    if (!r.ok) throw new Error(data.detail || ('HTTP ' + r.status));
     return data;
   });
 }
@@ -295,7 +297,7 @@ function money(n){ return '¥'+(n||0).toLocaleString('zh-CN',{minimumFractionDig
 function quickFill(role){ $('#li-user').value = role; $('#li-pass').value = role+'123'; }
 async function doLogin(){
   try{
-    const d = await api('/auth/login',{method:'POST',body:JSON.stringify({username:$('#li-user').value.trim(),password:$('#li-pass').value})});
+    const d = await api('/auth/login',{method:'POST',body:JSON.stringify({username:$('#li-user').value.trim(),password:$('#li-pass').value.trim()})});
     TOKEN=d.token; USER=d.user;
     localStorage.setItem('va_token',TOKEN); localStorage.setItem('va_user',JSON.stringify(USER));
     enterApp();
