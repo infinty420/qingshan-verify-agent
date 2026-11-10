@@ -265,10 +265,22 @@ tr:hover td{background:#fafbfc}
 const $ = s => document.querySelector(s);
 let TOKEN = null, USER = null, curSession = null, streaming = false;
 
+/* 云端分享链接兼容：若 URL 带 sharecode，则附加到每个 API 请求上，
+   避免 iframe/无痕/第三方 Cookie 拦截导致代理 403（不依赖 Cookie） */
+function shareQ(){
+  const m = location.search.match(/[?&]sharecode=([^&]+)/);
+  return m ? ('sharecode=' + encodeURIComponent(m[1])) : '';
+}
+function withShare(url){
+  const q = shareQ();
+  return q ? (url + (url.includes('?') ? '&' : '?') + q) : url;
+}
+
 function api(path, opts = {}) {
   opts.headers = Object.assign({'Content-Type':'application/json'}, TOKEN ? {Authorization:'Bearer '+TOKEN} : {}, opts.headers||{});
-  return fetch('/api/v1'+path, opts).then(async r => {
+  return fetch(withShare('/api/v1'+path), opts).then(async r => {
     if (r.status === 401) { toast('登录已过期，请重新登录'); logout(); throw new Error('401'); }
+    if (r.status === 403) { toast('访问被拒绝(403)：请确认使用完整分享链接（含 ?sharecode=...）'); throw new Error('403'); }
     const data = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(data.detail || r.status);
     return data;
@@ -401,9 +413,10 @@ async function sendChat(){
   bubble.innerHTML='<span class="typing"><i></i><i></i><i></i></span>';
   let cites=null;
   try{
-    const resp=await fetch('/api/v1/chat/stream',{method:'POST',
+    const resp=await fetch(withShare('/api/v1/chat/stream'),{method:'POST',
       headers:{'Content-Type':'application/json',Authorization:'Bearer '+TOKEN},
       body:JSON.stringify({session_id:curSession,content:text})});
+    if(resp.status===403) throw new Error('访问被拒绝(403)：请用完整分享链接打开');
     if(!resp.ok) throw new Error('HTTP '+resp.status);
     const reader=resp.body.getReader(), dec=new TextDecoder();
     let buf='';
